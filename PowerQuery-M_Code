@@ -1,0 +1,21 @@
+let
+    Source = Excel.Workbook(File.Contents("INSERT_YOUR_FILEPATH_HERE"), null, true),
+    #"Mission Critical Report w Purg_Sheet" = Source{[Item="Mission Critical Report w Purg",Kind="Sheet"]}[Data],
+    Column1 = #"Mission Critical Report w Purg_Sheet"{3}[Column1],
+    ReportDate = Text.Range(Column1, 19, 10),
+    #"Return to Navigation Step" = #"Mission Critical Report w Purg_Sheet",
+    #"Removed Top 5 Rows" = Table.Skip(#"Return to Navigation Step",5),
+    #"Promoted Headers" = Table.PromoteHeaders(#"Removed Top 5 Rows", [PromoteAllScalars=true]),
+    #"Filled Down on Hierarchy Name Lvl 5" = Table.FillDown(#"Promoted Headers",{"Hierarchy Name (Level 5)"}),
+    #"Filtered Rows for 301 FW" = Table.SelectRows(#"Filled Down on Hierarchy Name Lvl 5", each ([#"Hierarchy Name (Level 5)"] = "301 FW - CARSWELL AFB")),
+    #"Filled Down on Hierarchy Name Lvl 6" = Table.FillDown(#"Filtered Rows for 301 FW",{"Hierarchy Name (Level 6)", "Hierarchy Name (Level 7)"}),
+    #"Added Group Column" = Table.AddColumn(#"Filled Down on Hierarchy Name Lvl 6", "Group", each if [#"Hierarchy Name (Level 6)"] = "44 FG TYNDALL" then "44 FG" else if [#"Hierarchy Name (Level 6)"] = "301 FW" then "WSA" else if [#"Hierarchy Name (Level 6)"] = "301 MXG" then "MXG" else if [#"Hierarchy Name (Level 6)"] = "301 MSG" then "MSG" else null, type text),
+    #"Added Unit Column" = Table.AddColumn(#"Added Group Column", "Unit", each if [#"Hierarchy Name (Level 7)"] = "" then "Fix Data" else if [#"Hierarchy Name (Level 7)"] = "301 FS TYNDALL" then "301 FS" else if [#"Hierarchy Name (Level 7)"] = "301 FW/FM" then "FM" else if [#"Hierarchy Name (Level 7)"] = "44 MXS TYNDALL" then "44 MXS" else if [#"Hierarchy Name (Level 7)"] = "301 AMXS" then "AMXS" else if [#"Hierarchy Name (Level 7)"] = "301 MXS" then "MXS" else if [#"Hierarchy Name (Level 7)"] = "301 LRS" then "LRS" else if [#"Hierarchy Name (Level 7)"] = "301 FSS" then "FSS" else if [#"Hierarchy Name (Level 7)"] = "301 CF" then "COMM" else if [#"Hierarchy Name (Level 7)"] = "301 SFS" then "SFS" else [#"Hierarchy Name (Level 7)"], type text),
+    #"Removed Other Columns" = Table.SelectColumns(#"Added Unit Column",{"Account Number", "Account Name", "Mission Critical Start Date", "Mission Critical End Date", "Cycle Date", "Last Payment Date", "Number Days Past Due", "Last Payment Amount", "Current Balance", "Group", "Unit"}),
+    #"Reordered Columns" = Table.ReorderColumns(#"Removed Other Columns",{"Group", "Unit", "Account Number", "Account Name", "Mission Critical Start Date", "Mission Critical End Date", "Cycle Date", "Last Payment Date", "Number Days Past Due", "Last Payment Amount", "Current Balance"}),
+    #"Capitalized Each Word" = Table.TransformColumns(#"Reordered Columns",{{"Account Name", Text.Proper, type text}}),
+    #"Renamed Columns" = Table.RenameColumns(#"Capitalized Each Word",{{"Account Number", "Account #"}, {"Account Name", "Name"}, {"Number Days Past Due", "# Days Past Due"}}),
+    #"Added Last Refreshed Column" = Table.AddColumn(#"Renamed Columns", "Last Refreshed Date", each Text.Start(ReportDate,10)),
+    #"Changed Type" = Table.TransformColumnTypes(#"Added Last Refreshed Column",{{"Account #", type text}, {"Mission Critical Start Date", type date}, {"Mission Critical End Date", type date}, {"Cycle Date", type text}, {"Last Payment Date", type date}, {"# Days Past Due", type text}, {"Last Payment Amount", Currency.Type}, {"Current Balance", Currency.Type}, {"Last Refreshed Date", type date}})
+in
+    #"Changed Type"
